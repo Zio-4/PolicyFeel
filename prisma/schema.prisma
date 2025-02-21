@@ -1,0 +1,137 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // directUrl = env("DIRECT_URL") // For supabase
+}
+
+enum PartyAffiliation {
+  DEMOCRAT
+  REPUBLICAN 
+  INDEPENDENT
+  LIBERTARIAN
+  GREEN
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum Gender {
+  MALE
+  FEMALE 
+  NON_BINARY
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum AgeRange {
+  UNDER_18
+  AGE_18_24
+  AGE_25_34
+  AGE_35_44
+  AGE_45_54
+  AGE_55_64
+  AGE_65_PLUS
+  PREFER_NOT_TO_SAY
+}
+
+model User {
+  id               Int               @id @default(autoincrement())
+  username         String            @unique
+  email            String
+  phone            String?
+  location         String
+  partyAffiliation PartyAffiliation? 
+  gender           Gender?
+  ageRange         AgeRange?
+  isVerified       Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  
+  // Relations
+  comments         Comment[]
+  votes            Vote[]
+}
+
+model BillFederal {
+  id                Int             @id @default(autoincrement())
+  congress          String
+  billType         String
+  billNumber       String
+  title            String
+  description      String
+  introducedDate   DateTime
+  originChamber    String
+  status           String
+  lastUpdated      DateTime
+  externalSourceUrl String
+  sponsor          String
+  committees       String[]
+  subjects         String[]
+  
+  // Relations
+  statistics       BillStatistic[]
+  comments         Comment[]
+  votes            Vote[]
+}
+
+model BillStatistic {
+  id              Int         @id @default(autoincrement())
+  billId          Int
+  statisticType   String
+  value           Json        // Using Json type for JSONB data
+  lastCalculated  DateTime
+  
+  // Relations
+  bill            BillFederal @relation(fields: [billId], references: [id])
+
+  @@index([billId]) // Index for better query performance
+}
+
+model Comment {
+  id              Int         @id @default(autoincrement())
+  billId          Int
+  userId          Int
+  parentCommentId Int?
+  text            String
+  createdAt       DateTime    @default(now())
+  
+  // Relations
+  bill            BillFederal @relation(fields: [billId], references: [id])
+  user            User        @relation(fields: [userId], references: [id])
+  parentComment   Comment?    @relation("CommentReplies", fields: [parentCommentId], references: [id])
+  replies         Comment[]   @relation("CommentReplies")
+
+  @@index([billId])
+  @@index([userId])
+  @@index([parentCommentId])
+}
+
+enum VoteType {
+  UPVOTE
+  DOWNVOTE
+  NEUTRAL
+}
+
+model Vote {
+  id          Int         @id @default(autoincrement())
+  billId      Int
+  userId      Int
+  voteType    VoteType
+  createdAt   DateTime    @default(now())
+  
+  // Relations
+  bill        BillFederal @relation(fields: [billId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@index([billId])
+  @@index([userId])
+  @@unique([billId, userId]) // Ensures one vote per user per bill
+}
